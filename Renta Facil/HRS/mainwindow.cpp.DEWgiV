@@ -1,0 +1,281 @@
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+#include <QFile>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QPixmap>
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow){
+
+    ui->setupUi(this);
+    db = QSqlDatabase::addDatabase("QMYSQL");
+    db.setPort(3306);
+    db.setHostName("localhost");
+    db.setUserName("root");
+    db.setPassword("");
+    db.setDatabaseName("rentas");
+    if (!db.open()){ qDebug() << "Error al conectar."; }
+    else{ qDebug() << "Conectada."; }
+
+
+    QPixmap pix5("C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/inicio.jpg");
+    int counterf = 0;
+    int counterc = 0;
+
+    for(int i=0; i<35 ; i++){
+        QLabel *label = new QLabel;
+        label->setPixmap(pix5.scaled(250,153));
+        ui->layout->addWidget(label, counterf, counterc,1,1);
+        label->setFixedSize(210, 125);
+
+        QPushButton *ver = new QPushButton("Ver detalles");
+        ui->layout->addWidget(ver, counterf+1, counterc,1,1);
+        ver->setFixedSize(90, 20);
+
+        connect(ver, SIGNAL(clicked()), this, SLOT(Detalles()));
+        counterc++;
+        if (counterc == 3){
+            counterf= counterf+2;
+            counterc = 0;
+        }
+    }
+}
+
+void MainWindow::Detalles(){
+    ui->stackedWidget->setCurrentIndex(5);
+}
+
+MainWindow::~MainWindow(){
+    delete ui;
+}
+
+//--------------------------------------Interfaces principales----------------------------------
+
+void MainWindow::on_IniciarSesion_clicked(){
+    QSqlQuery sql;
+    username = ui -> lineEdit_Usuario -> text();
+    password = ui -> lineEdit_password -> text();
+
+
+    iniciar="select usuario, contrasena from login where usuario='" +username+"' and contrasena = '"+ password +"'";
+
+    if(ui->lineEdit_Usuario->text()=="Admin" && ui->lineEdit_password->text()=="admin" ){
+        ui->stackedWidget->setCurrentIndex(16);
+    }
+    else{
+        if(ui->ButtonCliente_2->isChecked()){
+            if(ui->ButtonCliente_2->text()=="Cliente"){
+                if(sql.exec(iniciar)){
+                    ui->stackedWidget->setCurrentIndex(3);
+                }
+            }
+        }
+        if(ui->ButtonPropi_2->isChecked()){
+            if(ui->ButtonPropi_2->text()=="Propietario"){
+                if(sql.exec(iniciar)){
+                    ui->stackedWidget->setCurrentIndex(13);
+                }
+            }
+        }
+
+    }
+    ui -> lineEdit_Usuario ->clear();
+    ui -> lineEdit_password ->clear();
+    ui->ButtonCliente_2->setAutoExclusive(false);
+    ui->ButtonCliente_2->setChecked(false);
+    ui->ButtonPropi_2->setAutoExclusive(false);
+    ui->ButtonPropi_2->setChecked(false);
+}
+void MainWindow::on_registro_clicked(){
+    ui->stackedWidget->setCurrentIndex(1);
+}
+void MainWindow::on_regresar_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+void MainWindow::on_OContra_clicked(){
+    ui->stackedWidget->setCurrentIndex(2);
+}
+void MainWindow::on_CrearCuenta_clicked(){
+    if (db.open()){
+        QString nombre, apellidom, apellidop, usuario, email, contra, tel , checkExist, existente;
+        QSqlQuery sql, sql2, sql3;
+        nombre=ui->NombreReg->text();
+        apellidom=ui->ApellidoReg->text();
+        apellidop=ui->ApellidoReg_2->text();
+        usuario=ui->UsuarioReg->text();
+        tel=ui->TelReg->text();
+        email=ui->CorreoReg->text();
+        contra=ui->ContraReg->text();
+        existente = "select * from login where usuario = '"+ usuario +"'";
+
+        if(nombre.isEmpty()||apellidom.isEmpty()||apellidop.isEmpty()||email.isEmpty()||contra.isEmpty()||usuario.isEmpty()|| tel.isEmpty()){
+            QMessageBox::about(this, "Error", "Campos Vacios");
+        }
+        else{
+            if(sql.exec(existente)){
+                if(sql.next() == true){
+                    QMessageBox::information(this, "Error al registrar", "Nombre de usuario ya existe");
+                }
+                else{
+                    if(ui->ButtonCliente->isChecked()){
+                        if(ui->ButtonCliente->text()=="Cliente"){
+                            qDebug() << "insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "');";
+                            qDebug() << "insert into cliente(nombre, a_paterno, a_materno, telefono, correo, usuario) values('" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "','" +usuario+ "');";
+
+                            if (sql2.exec("insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "')")){
+                                if(sql3.exec("insert into cliente (usuario, nombre, a_paterno, a_materno, telefono, correo) values('" +usuario+ "','" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "')")){
+                                    QMessageBox::about(this, "Registro", "Registro Exitoso");
+                                }
+                                else{
+                                    QMessageBox::about(this, "Regitro", "La cuenta no se ha creado");
+                                }
+                            }
+                        }
+                    }
+                    if(ui->ButtonPropi->isChecked()){
+                        if(ui->ButtonPropi->text()=="Propietario"){
+                            qDebug() << "insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "');";
+                            qDebug() << "insert into propietario(nombre, a_paterno, a_materno, telefono, correo, usuario) values('" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "','" +usuario+ "');";
+
+                            if (sql2.exec("insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "')")){
+                                if(sql3.exec("insert into propietario (usuario, nombre, a_paterno, a_materno, telefono, correo) values('" +usuario+ "','" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "')")){
+                                    QMessageBox::about(this, "Registro", "Registro Exitoso");
+                                }
+                                else{
+                                    QMessageBox::about(this, "Regitro", "La cuenta no se ha creado");
+                                }
+                            }
+                        }
+                    }
+                    ui->NombreReg->clear();
+                    ui->ApellidoReg->clear();
+                    ui->ApellidoReg_2->clear();
+                    ui->UsuarioReg->clear();
+                    ui->TelReg->clear();
+                    ui->CorreoReg->clear();
+                    ui->ContraReg->clear();
+                }
+            }
+        }
+    }
+}
+void MainWindow::on_regresar_2_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+void MainWindow::on_cambiarC_clicked(){
+
+    QString username=ui->user-> text();
+    QString password = ui -> CPass -> text();
+    QString password2 = ui -> CPass2-> text();
+    QSqlQuery query, query2;
+    if (query.exec("update login set contrasena = '"+password2+"' where usuario = '"+username+"' and contrasena= '"+password+"';")){
+            ui->stackedWidget->setCurrentIndex(0);
+    }
+}
+
+//-------------------------------------- Interfaces del Cliente ----------------------------------
+
+void MainWindow::on_salir_14_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//-------------------------------------- Interfaces del Propietario ----------------------------------
+void MainWindow::on_salir_8_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+
+void MainWindow::on_AddCasa_clicked(){
+    QString desc, servicios, nombre, estado,municipio, calle, colonia, no_interior, no_exterior, cp, habitaciones, banos, precio;
+    QByteArray imagen;
+    QSqlQuery sql;
+    QString direccion, casa, id, idP, idFoto;
+    desc= ui->plainTextEdit_3->toPlainText();
+    servicios= ui->plainTextEdit_2->toPlainText();
+    nombre= ui->nom_casa_2->text();
+    estado= ui->estado_3->text();
+    municipio= ui->municipio->text();
+    calle= ui->calle_2->text();
+    colonia= ui->colonia_2->text();
+    no_interior= ui->no_interior->text();
+    no_exterior= ui->no_exterior->text();
+    cp=ui->cp_2->text();
+    habitaciones=ui->no_habitaciones->text();
+    banos= ui->banos_2->text();
+    precio= ui->precio_3->text();
+
+    direccion= "insert into direccion(estado, municipio, calle, colonia, no_interior, no_exterior, cp) "
+               "values('"+estado+ "' , '" + municipio + "' , '" +calle+ "' , '"+colonia+ "' , '" +no_interior+ "' , '" +no_exterior+"' , '"+cp+"')";
+
+    QSqlQuery insert;
+    insert.prepare(direccion);
+    insert.exec();
+
+    id= "select MAX(idDireccion) from direccion";
+
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+        qDebug()<<id;
+    }
+
+    idP="select idPropietario from Propietario where Propietario.usuario= '"+username+"'";
+    QSqlQuery idPropi;
+    idPropi.prepare(idP);
+    idPropi.exec();
+    while ( idPropi.next()){
+        idP=idPropi.value(0).toString();
+        qDebug()<<id;
+    }
+
+    QString insertfoto;
+    insertfoto="insert into fotos(ruta, imagen)values(' ','"+ruta1+"',:datos);";
+
+    QSqlQuery insertfoto1;
+    insertfoto1.prepare(insertfoto);
+    insertfoto1.bindValue(":datos",imagen1);
+    insertfoto1.exec();
+
+    idFoto= "select MAX(idFotos) from fotos";
+
+    QSqlQuery insertImagen;
+    insertImagen.prepare(idFoto);
+    insertImagen.exec();
+    while ( insertImagen.next()){
+        idFoto=insertImagen.value(0).toString();
+        qDebug()<<id;
+    }
+
+    casa= "insert into casa(nombre, no_habitaciones, no_banos, precio, descripcion, idCatalogo, idDireccion, idFotos, idPropietario) values('" + nombre + "' , '" +habitaciones+ "' , '" +banos+ "' , '" +precio+ "' , '" +desc+ "' , ', '1' , '" +id+ "' , '" +idFoto+ " ', '"+idP+"')";
+
+    QSqlQuery insertcasa1;
+    insertcasa1.prepare(casa);
+    insertcasa1.exec();
+
+    qDebug()<<idP;
+    qDebug()<<direccion;
+    qDebug()<<id;
+    qDebug()<<casa;
+}
+
+
+void MainWindow::on_addFoto_clicked(){
+    auto nombreArchivo=QFileDialog::getOpenFileName(this,"abrir imagen",QDir::rootPath(),"imagenes(*.png *.jpg *.jpeg);; cualquier archivo(*.*)");
+    ruta=nombreArchivo;
+    QFile archivo(ruta);
+    if(!archivo.open(QIODevice::ReadOnly)){
+        return;
+    }
+
+    QByteArray mostrar=archivo.readAll();
+    QPixmap imag;
+    imag.loadFromData(mostrar);
+    ui->img_casa->setPixmap(imag);
+    ruta1=ruta;
+    imagen1=mostrar;
+
+}

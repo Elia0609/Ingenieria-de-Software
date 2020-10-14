@@ -1,0 +1,1475 @@
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+#include <QFile>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QPixmap>
+#include<QString>
+#include <QSqlQuery>
+#include<QMessageBox>
+#include <QFile>
+#include <QFileDialog>
+#include <QPixmap>
+#include <QCompleter>
+#include <QFileSystemModel>
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow){
+
+    ui->setupUi(this);
+    db = QSqlDatabase::addDatabase("QMYSQL");
+    db.setPort(3306);
+    db.setHostName("localhost");
+    db.setUserName("root");
+    db.setPassword("");
+    db.setDatabaseName("rentas");
+    if (!db.open()){ qDebug() << "Error al conectar."; }
+    else{ qDebug() << "Conectada."; }
+    f= -1;
+    CasaEspera();
+    CatalogoPrincipal();
+    CatalogoPropi();
+    CatalogoAdmin();
+
+}
+
+void MainWindow::Detalles(){
+    ui->stackedWidget->setCurrentIndex(5);
+}
+void MainWindow::Detalles2(){
+    ui->stackedWidget->setCurrentIndex(18);
+}
+MainWindow::~MainWindow(){
+    delete ui;
+}
+
+//Catalogos
+void MainWindow::CatalogoPrincipal(){
+    QSqlQuery catalogo,sacarfoto;
+       QString catalogosql, titulo, llamarFoto;
+       QPixmap imagen;
+       QIcon imagenreal;
+       QByteArray img;
+
+       catalogosql = "select nombre from Casa where casa.idCatalogo='2'; ";
+       catalogo.exec(catalogosql);
+       int counterf = 0;
+       int counterc = 0;
+
+       while (catalogo.next()){
+           titulo = catalogo.value(0).toString();
+           llamarFoto="call Nombre('"+titulo+"');";
+           sacarfoto.exec(llamarFoto);
+           sacarfoto.next();
+           img=sacarfoto.value(0).toByteArray();
+           imagen.loadFromData(img);
+
+           QLabel *label = new QLabel;
+           label->setPixmap(imagen.scaled(210, 125));
+           label->setFixedSize(210, 125);
+           ui->layout->addWidget(label, counterf, counterc,1,1);
+
+           QPushButton *h = new QPushButton("Ver detalles");
+           h->setAccessibleName(titulo);
+           h->setFixedSize(90, 20);
+           ui->layout->addWidget(h , counterf+1, counterc, 1, 1);
+           QSignalMapper *mapper=new QSignalMapper(this);
+           connect(h,SIGNAL(clicked(bool)),mapper,SLOT(map()));
+           mapper->setMapping(h,titulo);
+           connect(mapper,SIGNAL(mapped(QString)),this,SLOT(darEspecificacion(QString)));
+
+           counterc++;
+
+           if (counterc == 3){
+               counterf= counterf + 2;
+               counterc = 0;
+           }
+       }
+}
+void MainWindow::darEspecificacion(QString clave) {
+    QString  estado, municipio, calle, no_interior, no_exterior, cp, id, casa, llamarFoto, buscar, info, nombre, no_habitaciones, no_banos, precio, descripcion, servicios, valoracion;
+
+    buscar="select titulo from casa where titulo='"+clave+"'; ";
+    QSqlQuery Informacion, query, sacarfoto, casas;
+
+    Informacion.exec(buscar);
+    Informacion.next();
+    QByteArray img;
+    QPixmap imagen;
+    QPixmap cinco( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/5estrellas.png" );
+    QPixmap cuatro( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/4estrellas.png" );
+    QPixmap tres( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/3estrellas.png" );
+    QPixmap dos( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/2estrellas.png" );
+    QPixmap uno( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/1estrellas.png" );
+
+    llamarFoto="call Nombre('"+clave+"');";
+    sacarfoto.exec(llamarFoto);
+    sacarfoto.next();
+    img=sacarfoto.value(0).toByteArray();
+    imagen.loadFromData(img);
+
+    ui->imagPrincipal->setPixmap(imagen.scaled(251, 151));
+    ui->imagPrincipal->setFixedSize(251, 151);
+
+
+    ui->stackedWidget->setCurrentIndex(5);
+    info="select nombre, no_habitaciones, no_banos, precio, descripcion, servicios, valoracion from casa where casa.nombre= '"+ clave +"'";
+    if (query.exec(info)){
+        while (query.next()){
+            nombre = query.value(0).toString();
+            no_habitaciones = query.value(1).toString();
+            no_banos = query.value(2).toString();
+            precio = query.value(3).toString();
+            descripcion = query.value(4).toString();
+            servicios = query.value(5).toString();
+            valoracion = query.value(6).toString();
+            qDebug()<<valoracion;
+
+            if(valoracion=="5"){
+                ui->valoracion->setPixmap(cinco.scaled(91,20));
+            }
+            if(valoracion=="4"){
+                ui->valoracion->setPixmap(cuatro.scaled(91,20));
+            }
+            if(valoracion=="3"){
+                ui->valoracion->setPixmap(tres.scaled(91,20));
+            }
+            if(valoracion=="2"){
+                ui->valoracion->setPixmap(dos.scaled(91,20));
+            }
+            if(valoracion=="1"){
+                ui->valoracion->setPixmap(uno.scaled(91,20));
+            }
+
+            ui->Nom->setText(nombre);
+            ui->Habit->setText(no_habitaciones+" habitaciones");
+            ui->banos->setText(no_banos+" baños");
+            ui->precio->setText("$ "+precio+" MXN");
+            ui->desc->setText(descripcion);
+            ui->servicio->setText(servicios);
+        }
+    }
+
+    id="select idDireccion from casa where Casa.nombre = '"+ clave +"'";
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+    }
+
+    casa="select estado, municipio, calle, no_interior, no_exterior, cp from direccion where direccion.idDireccion= '"+ id +"'";
+    if (casas.exec(casa)){
+        while (casas.next()){
+            estado = casas.value(0).toString();
+            municipio = casas.value(1).toString();
+            calle = casas.value(2).toString();
+            no_interior = casas.value(3).toString();
+            no_exterior = casas.value(4).toString();
+            cp = casas.value(5).toString();
+
+            ui->estadoRes->setText(estado);
+            ui->municipioRes->setText(municipio);
+            ui->calleRes->setText(calle);
+            ui->NIRes->setText(no_interior);
+            ui->NERes->setText(no_exterior);
+            ui->CPRes->setText(cp);
+
+        }
+    }
+
+}
+void MainWindow::CatalogoPropi(){
+    QSqlQuery catalogo,sacarfoto;
+    QString catalogosql, titulo, llamarFoto, idP;
+    QPixmap imagen;
+    QIcon imagenreal;
+    QByteArray img;
+
+    idP="select idPropietario from Propietario where Propietario.usuario= '" +username+ " '; ";
+    QSqlQuery idPropi;
+    idPropi.prepare(idP);
+    idPropi.exec();
+    while ( idPropi.next()){
+        idP=idPropi.value(0).toString();
+    }
+
+
+    catalogosql = "select nombre from Casa where casa.idPropietario= '"+idP+"' and casa.idCatalogo='2';";
+    catalogo.exec(catalogosql);
+    int counterf = 0;
+    int counterc = 0;
+
+    while (catalogo.next()){
+        qDebug()<< catalogosql;
+        titulo = catalogo.value(0).toString();
+        llamarFoto="call Nombre('"+titulo+"');";
+        sacarfoto.exec(llamarFoto);
+        sacarfoto.next();
+        img=sacarfoto.value(0).toByteArray();
+        imagen.loadFromData(img);
+
+        QLabel *label = new QLabel;
+        label->setPixmap(imagen.scaled(200, 125));
+        label->setMaximumWidth(200);
+        label->setMaximumHeight(125);
+        ui->catalodo_propi->addWidget(label, counterf, counterc,1,1);
+
+        QPushButton *h = new QPushButton("Ver detalles");
+        h->setAccessibleName(titulo);
+        h->setFixedSize(90, 20);
+        ui->catalodo_propi->addWidget(h , counterf+1, counterc, 1, 1);
+        QSignalMapper *mapper=new QSignalMapper(this);
+        connect(h,SIGNAL(clicked(bool)),mapper,SLOT(map()));
+        mapper->setMapping(h,titulo);
+        connect(mapper,SIGNAL(mapped(QString)),this,SLOT(darEspecificacionP(QString)));
+
+        counterc++;
+
+        if (counterc == 3){
+            counterf= counterf + 2;
+            counterc = 0;
+        }
+    }
+}
+void MainWindow::darEspecificacionP(QString clave){
+    QString  estado, municipio, calle, no_interior, no_exterior, cp, id, casa, llamarFoto, buscar, info, nombre, no_habitaciones, no_banos, precio, descripcion, servicios, valoracion;
+
+    buscar="select nombre from casa where casa.nombre='"+clave+"'; ";
+    QSqlQuery Informacion, query, sacarfoto, casas;
+
+    Informacion.exec(buscar);
+    Informacion.next();
+    QByteArray img;
+    QPixmap imagen;
+    QPixmap cinco( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/5estrellas.png" );
+    QPixmap cuatro( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/4estrellas.png" );
+    QPixmap tres( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/3estrellas.png" );
+    QPixmap dos( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/2estrellas.png" );
+    QPixmap uno( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/1estrellas.png" );
+
+    llamarFoto="call Nombre('"+clave+"');";
+    sacarfoto.exec(llamarFoto);
+    sacarfoto.next();
+    img=sacarfoto.value(0).toByteArray();
+    imagen.loadFromData(img);
+
+    ui->imgCas->setPixmap(imagen.scaled(241, 221));
+    ui->imgCas->setFixedSize(241, 221);
+
+
+    ui->stackedWidget->setCurrentIndex(11);
+    info="select nombre, no_habitaciones, no_banos, precio, descripcion, servicios, valoracion from casa where casa.nombre= '"+ clave +"'";
+    if (query.exec(info)){
+        while (query.next()){
+            nombre = query.value(0).toString();
+            no_habitaciones = query.value(1).toString();
+            no_banos = query.value(2).toString();
+            precio = query.value(3).toString();
+            descripcion = query.value(4).toString();
+            servicios = query.value(5).toString();
+            valoracion = query.value(6).toString();
+
+            if(valoracion=="5"){
+                ui->label_83->setPixmap(cinco.scaled(91,20));
+            }
+            if(valoracion=="4"){
+                ui->label_83->setPixmap(cuatro.scaled(91,20));
+            }
+            if(valoracion=="3"){
+                ui->label_83->setPixmap(tres.scaled(91,20));
+            }
+            if(valoracion=="2"){
+                ui->label_83->setPixmap(dos.scaled(91,20));
+            }
+            if(valoracion=="1"){
+                ui->label_83->setPixmap(uno.scaled(91,20));
+            }
+
+            ui->nom_casa->setText(nombre);
+            ui->habitaciones_2->setText(no_habitaciones+" habitaciones");
+            ui->Nbanos->setText(no_banos+" baños");
+            ui->precio_2->setText("$ "+precio+" MXN");
+            ui->desc_2->setText(descripcion);
+            ui->servicios->setText(servicios);
+        }
+    }
+
+    id="select idDireccion from casa where Casa.nombre = '"+ clave +"'";
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+    }
+
+    casa="select estado, municipio, calle, no_interior, no_exterior, cp from direccion where direccion.idDireccion= '"+ id +"'";
+    if (casas.exec(casa)){
+        while (casas.next()){
+            estado = casas.value(0).toString();
+            municipio = casas.value(1).toString();
+            calle = casas.value(2).toString();
+            no_interior = casas.value(3).toString();
+            no_exterior = casas.value(4).toString();
+            cp = casas.value(5).toString();
+
+            ui->estado_2->setText(estado);
+            ui->colonia->setText(municipio);
+            ui->calle->setText(calle);
+            ui->no_int->setText(no_interior);
+            ui->no_ext->setText(no_exterior);
+            ui->cp->setText(cp);
+
+        }
+    }
+
+}
+void MainWindow::CatalogoAdmin(){
+    QSqlQuery catalogo,sacarfoto;
+    QString catalogosql, titulo, llamarFoto;
+    QPixmap imagen;
+    QIcon imagenreal;
+    QByteArray img;
+
+    catalogosql = "select nombre from Casa where casa.idCatalogo='2'; ";
+    catalogo.exec(catalogosql);
+    int counterf = 0;
+    int counterc = 0;
+
+    while (catalogo.next()){
+        titulo = catalogo.value(0).toString();
+        llamarFoto="call Nombre('"+titulo+"');";
+        sacarfoto.exec(llamarFoto);
+        sacarfoto.next();
+        img=sacarfoto.value(0).toByteArray();
+        imagen.loadFromData(img);
+
+        QLabel *label = new QLabel;
+        label->setPixmap(imagen.scaled(210, 125));
+        label->setFixedSize(210, 125);
+        ui->layout_3->addWidget(label, counterf, counterc,1,1);
+
+        QPushButton *h = new QPushButton("Ver detalles");
+        h->setAccessibleName(titulo);
+        h->setFixedSize(90, 20);
+        ui->layout_3->addWidget(h , counterf+1, counterc, 1, 1);
+        QSignalMapper *mapper=new QSignalMapper(this);
+        connect(h,SIGNAL(clicked(bool)),mapper,SLOT(map()));
+        mapper->setMapping(h,titulo);
+        connect(mapper,SIGNAL(mapped(QString)),this,SLOT(darEspecificacionA(QString)));
+
+        counterc++;
+
+        if (counterc == 3){
+            counterf= counterf + 2;
+            counterc = 0;
+        }
+    }
+}
+void MainWindow::darEspecificacionA(QString clave){
+
+    QString  estado, municipio, calle, no_interior, no_exterior, cp, id, casa, llamarFoto, buscar, info, nombre, no_habitaciones, no_banos, precio, descripcion, servicios, valoracion;
+    QSqlQuery Informacion, query, sacarfoto, casas;
+
+    Informacion.exec(buscar);
+    Informacion.next();
+    QByteArray img;
+    QPixmap imagen;
+    QPixmap cinco( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/5estrellas.png" );
+    QPixmap cuatro( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/4estrellas.png" );
+    QPixmap tres( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/3estrellas.png" );
+    QPixmap dos( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/2estrellas.png" );
+    QPixmap uno( "C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/1estrellas.png" );
+
+    llamarFoto="call Nombre('"+clave+"');";
+    sacarfoto.exec(llamarFoto);
+    sacarfoto.next();
+    img=sacarfoto.value(0).toByteArray();
+    imagen.loadFromData(img);
+
+    ui->label_ImagenCasa_18->setPixmap(imagen.scaled(281, 241));
+    ui->label_ImagenCasa_18->setFixedSize(281, 241);
+
+
+    ui->stackedWidget->setCurrentIndex(17);
+    info="select nombre, no_habitaciones, no_banos, precio, descripcion, servicios, valoracion from casa where casa.nombre= '"+ clave +"'";
+    if (query.exec(info)){
+        while (query.next()){
+            nombre = query.value(0).toString();
+            no_habitaciones = query.value(1).toString();
+            no_banos = query.value(2).toString();
+            precio = query.value(3).toString();
+            descripcion = query.value(4).toString();
+            servicios = query.value(5).toString();
+            valoracion = query.value(6).toString();
+            qDebug()<<valoracion;
+
+            if(valoracion=="5"){
+                ui->mascota_2->setPixmap(cinco.scaled(91,19));
+            }
+            if(valoracion=="4"){
+                ui->mascota_2->setPixmap(cuatro.scaled(91,19));
+            }
+            if(valoracion=="3"){
+                ui->mascota_2->setPixmap(tres.scaled(91,19));
+            }
+            if(valoracion=="2"){
+                ui->mascota_2->setPixmap(dos.scaled(91,19));
+            }
+            if(valoracion=="1"){
+                ui->mascota_2->setPixmap(uno.scaled(91,19));
+            }
+
+            ui->label_299->setText(nombre);
+            ui->habitaciones_3->setText(no_habitaciones+" habitaciones");
+            ui->banos_3->setText(no_banos+" baños");
+            ui->precio_4->setText("$ "+precio+" MXN");
+            ui->Desc->setText(descripcion);
+            ui->servicio_2->setText(servicios);
+        }
+     }
+    id="select idDireccion from casa where Casa.nombre = '"+ clave +"'";
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+    }
+
+    casa="select estado, municipio, calle, no_interior, no_exterior, cp from direccion where direccion.idDireccion= '"+ id +"'";
+    if (casas.exec(casa)){
+        while (casas.next()){
+            estado = casas.value(0).toString();
+            municipio = casas.value(1).toString();
+            calle = casas.value(2).toString();
+            no_interior = casas.value(3).toString();
+            no_exterior = casas.value(4).toString();
+            cp = casas.value(5).toString();
+
+            ui->estado_4->setText(estado);
+            ui->Mun->setText(municipio);
+            ui->calle_3->setText(calle);
+            ui->no_interior_2->setText(no_interior);
+            ui->no_exterior_2->setText(no_exterior);
+            ui->cp_3->setText(cp);
+
+        }
+    }
+}
+
+//--------------------------------------Interfaces principales----------------------------------
+void MainWindow::on_IniciarSesion_clicked(){
+    QSqlQuery sql;
+    username = ui -> lineEdit_Usuario -> text();
+    password = ui -> lineEdit_password -> text();
+
+
+    iniciar="select usuario, contrasena from login where usuario='" +username+"' and contrasena = '"+ password +"'";
+
+    if(ui->lineEdit_Usuario->text()=="Admin" && ui->lineEdit_password->text()=="admin" ){
+        QMessageBox::about(this, "Bienvenido", "Bienvenido Administrador");
+        CasaEspera();
+        ui->stackedWidget->setCurrentIndex(15);
+    }
+    else{
+        if(ui->ButtonCliente_2->isChecked()){
+            if(ui->ButtonCliente_2->text()=="Cliente"){
+                if(sql.exec(iniciar)){
+                    QMessageBox::about(this, "Bienvenido", "Bienvenido Cliente");
+                    ui->stackedWidget->setCurrentIndex(3);
+                    CatalogoPrincipal();
+                }
+            }
+        }
+        if(ui->ButtonPropi_2->isChecked()){
+            if(ui->ButtonPropi_2->text()=="Propietario"){
+                if(sql.exec(iniciar)){
+                    QMessageBox::about(this, "Bienvenido", "Bienvenido Propietario");
+                    ui->stackedWidget->setCurrentIndex(10);
+                    CatalogoPropi();
+                }
+            }
+        }
+
+    }
+    ui -> lineEdit_Usuario ->clear();
+    ui -> lineEdit_password ->clear();
+    ui->ButtonCliente_2->setAutoExclusive(false);
+    ui->ButtonCliente_2->setChecked(false);
+    ui->ButtonPropi_2->setAutoExclusive(false);
+    ui->ButtonPropi_2->setChecked(false);
+}
+void MainWindow::on_registro_clicked(){
+    ui->stackedWidget->setCurrentIndex(1);
+}
+void MainWindow::on_regresar_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+void MainWindow::on_OContra_clicked(){
+    ui->stackedWidget->setCurrentIndex(2);
+}
+void MainWindow::on_CrearCuenta_clicked(){
+    if (db.open()){
+        QString nombre, apellidom, apellidop, usuario, email, contra, tel , checkExist, existente;
+        QSqlQuery sql, sql2, sql3;
+        nombre=ui->NombreReg->text();
+        apellidom=ui->ApellidoReg->text();
+        apellidop=ui->ApellidoReg_2->text();
+        usuario=ui->UsuarioReg->text();
+        tel=ui->TelReg->text();
+        email=ui->CorreoReg->text();
+        contra=ui->ContraReg->text();
+        existente = "select * from login where usuario = '"+ usuario +"'";
+
+        if(nombre.isEmpty()||apellidom.isEmpty()||apellidop.isEmpty()||email.isEmpty()||contra.isEmpty()||usuario.isEmpty()|| tel.isEmpty()){
+            QMessageBox::about(this, "Error", "Campos Vacios");
+        }
+        else{
+            if(sql.exec(existente)){
+                if(sql.next() == true){
+                    QMessageBox::information(this, "Error al registrar", "Nombre de usuario ya existe");
+                }
+                else{
+                    if(ui->ButtonCliente->isChecked()){
+                        if(ui->ButtonCliente->text()=="Cliente"){
+                            qDebug() << "insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "');";
+                            qDebug() << "insert into cliente(nombre, a_paterno, a_materno, telefono, correo, usuario) values('" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "','" +usuario+ "');";
+
+                            if (sql2.exec("insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "')")){
+                                if(sql3.exec("insert into cliente (usuario, nombre, a_paterno, a_materno, telefono, correo) values('" +usuario+ "','" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "')")){
+                                    QMessageBox::about(this, "Registro", "Registro Exitoso");
+                                }
+                                else{
+                                    QMessageBox::about(this, "Regitro", "La cuenta no se ha creado");
+                                }
+                            }
+                        }
+                    }
+                    if(ui->ButtonPropi->isChecked()){
+                        if(ui->ButtonPropi->text()=="Propietario"){
+                            qDebug() << "insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "');";
+                            qDebug() << "insert into propietario(nombre, a_paterno, a_materno, telefono, correo, usuario) values('" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "','" +usuario+ "');";
+
+                            if (sql2.exec("insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "')")){
+                                if(sql3.exec("insert into propietario (usuario, nombre, a_paterno, a_materno, telefono, correo) values('" +usuario+ "','" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "')")){
+                                    QMessageBox::about(this, "Registro", "Registro Exitoso");
+                                }
+                                else{
+                                    QMessageBox::about(this, "Regitro", "La cuenta no se ha creado");
+                                }
+                            }
+                        }
+                    }
+                    ui->NombreReg->clear();
+                    ui->ApellidoReg->clear();
+                    ui->ApellidoReg_2->clear();
+                    ui->UsuarioReg->clear();
+                    ui->TelReg->clear();
+                    ui->CorreoReg->clear();
+                    ui->ContraReg->clear();
+                }
+                ui->NombreReg->clear();
+                ui->ApellidoReg->clear();
+                ui->ApellidoReg_2->clear();
+                ui->UsuarioReg->clear();
+                ui->TelReg->clear();
+                ui->CorreoReg->clear();
+                ui->ContraReg->clear();
+            }
+        }
+    }
+}
+void MainWindow::on_regresar_2_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+void MainWindow::on_cambiarC_clicked(){
+
+    QString username=ui->user-> text();
+    QString password = ui -> CPass -> text();
+    QString password2 = ui -> CPass2-> text();
+    QSqlQuery query, query2;
+    if (query.exec("update login set contrasena = '"+password2+"' where usuario = '"+username+"' and contrasena= '"+password+"';")){
+            ui->stackedWidget->setCurrentIndex(0);
+    }
+}
+
+
+//--------------------------------------Interfaces del Propietario ----------------------------------
+
+//Datos del propietario
+void MainWindow::Datos(){
+   QString dato, nombre, a_paterno, a_materno, telefono, correo;
+    QSqlQuery query;
+    dato="select nombre, a_paterno, a_materno, telefono, correo, usuario from Propietario where usuario='"+username+"'";
+    if (query.exec(dato)){
+        while (query.next()){
+            nombre = query.value(0).toString();
+            a_paterno = query.value(1).toString();
+            a_materno = query.value(2).toString();
+            telefono = query.value(3).toString();
+            correo = query.value(4).toString();
+
+            ui->nom_2->setText(nombre);
+            ui->apellido_2->setText(a_paterno);
+            ui->apellido_3->setText(a_materno);
+            ui->tel_2->setText(telefono);
+            ui->correo_2->setText(correo);
+        }
+        ui->stackedWidget->setCurrentIndex(14);
+    }
+    else{
+       QMessageBox::information(this, "error", "error");
+    }
+
+}
+void MainWindow::DatosDireccion(){
+    QString estado, municipio, calle, colonia, no_interior, no_exterior, cp, direccion, Propi, id, id2;
+    QSqlQuery query;
+
+    id= "select MAX(idDireccion) from direccion";
+
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+    }
+
+    id2="select MAX(idDireccion) from Propietario";
+    QSqlQuery insert;
+    insert.prepare(id2);
+    insert.exec();
+    while ( insert.next()){
+        id2=insert.value(0).toString();
+    }
+
+    Propi="select d.estado, d.municipio, d.calle, d.colonia, d.no_interior, d.no_exterior, d.cp, p.idDireccion from Direccion as d, Propietario as p where d.idDireccion= ' " +id+" ' and p.idDireccion=' "+id2+" ';";
+     if (query.exec(Propi)){
+          while (query.next()){
+              estado=query.value(0).toString();
+              municipio=query.value(1).toString();
+              calle=query.value(2).toString();
+              colonia=query.value(3).toString();
+              no_interior=query.value(4).toString();
+              no_exterior=query.value(5).toString();
+              cp=query.value(6).toString();
+
+              ui->estado_5->setText(estado);
+              ui->municipio_2->setText(municipio);
+              ui->calle_4->setText(calle);
+              ui->colonia_4->setText(colonia);
+              ui->no_interior_3->setText(no_interior);
+              ui->no_exterior_3->setText(no_exterior);
+              ui->cp_4->setText(cp);
+          }
+           ui->stackedWidget->setCurrentIndex(14);
+     }
+}
+void MainWindow::DatosFoto(){
+    QPixmap imagen;
+    QIcon imagenreal;
+    QByteArray img;
+    QSqlQuery sql, sacarfoto;
+
+    QString insertfoto, idF, propi, llamarFoto;
+    llamarFoto="call FotoPropi('"+username+"');" ;
+
+
+    sacarfoto.exec(llamarFoto);
+    sacarfoto.next();
+    img=sacarfoto.value(0).toByteArray();
+    imagen.loadFromData(img);
+    ui->label_28->setPixmap(imagen.scaled(171,141));
+
+}
+void MainWindow::on_RCat_clicked(){
+    ui->stackedWidget->setCurrentIndex(10);
+}
+
+
+//Catalogo Casa Registradas
+void MainWindow::on_home_8_clicked(){
+    ui->stackedWidget->setCurrentIndex(10);
+}
+void MainWindow::on_add_8_clicked(){
+    ui->stackedWidget->setCurrentIndex(12);
+}
+void MainWindow::on_reservaciones_8_clicked(){
+
+    ui->stackedWidget->setCurrentIndex(13);
+}
+void MainWindow::on_ajustes_8_clicked(){
+
+    Datos();
+    DatosDireccion();
+    DatosFoto();
+    ui->stackedWidget->setCurrentIndex(14);
+}
+void MainWindow::on_salir_8_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//Pueblicar, Eliminar, Registrar casa
+void MainWindow::on_home_9_clicked(){
+    ui->stackedWidget->setCurrentIndex(10);
+}
+void MainWindow::on_add_9_clicked(){
+    ui->stackedWidget->setCurrentIndex(13);
+}
+void MainWindow::on_reservaciones_9_clicked(){
+    ui->stackedWidget->setCurrentIndex(13);
+}
+void MainWindow::on_ajustes_9_clicked(){
+    Datos();
+    DatosDireccion();
+    DatosFoto();
+    ui->stackedWidget->setCurrentIndex(14);
+}
+void MainWindow::on_salir_9_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//Agregar casa
+void MainWindow::on_AddCasa_clicked(){
+    QString desc, servicios, nombre, estado,municipio, calle, colonia, no_interior, no_exterior, cp, habitaciones, banos, precio, foto;
+    QByteArray imagen;
+    QSqlQuery sql;
+    QString direccion, casa, id, idP, idF;
+    desc= ui->plainTextEdit_3->toPlainText();
+    servicios= ui->plainTextEdit_2->toPlainText();
+    nombre= ui->nom_casa_2->text();
+    estado= ui->estado_3->text();
+    municipio= ui->municipio->text();
+    calle= ui->calle_2->text();
+    colonia= ui->colonia_2->text();
+    no_interior= ui->no_interior->text();
+    no_exterior= ui->no_exterior->text();
+    cp=ui->cp_2->text();
+    habitaciones=ui->no_habitaciones->text();
+    banos= ui->banos_2->text();
+    precio= ui->precio_3->text();
+
+    direccion= "insert into direccion(estado, municipio, calle, colonia, no_interior, no_exterior, cp) "
+               "values('"+estado+ "' , '" + municipio + "' , '" +calle+ "' , '"+colonia+ "' , '" +no_interior+ "' , '" +no_exterior+"' , '"+cp+"')";
+
+    QSqlQuery insert;
+    insert.prepare(direccion);
+    insert.exec();
+
+    id= "select MAX(idDireccion) from direccion";
+
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+    }
+
+    idP="select idPropietario from Propietario where Propietario.usuario= '"+username+"'";
+    QSqlQuery idPropi;
+    idPropi.prepare(idP);
+    idPropi.exec();
+    while ( idPropi.next()){
+        idP=idPropi.value(0).toString();
+    }
+
+    idF="select MAX(idFotos) from fotos";
+    QSqlQuery insert3;
+    insert3.prepare(idF);
+    insert3.exec();
+    while ( insert3.next()){
+        idF=insert3.value(0).toString();
+    }
+
+    casa= "insert into casa(nombre, no_habitaciones, no_banos, precio, descripcion, servicios, idCatalogo, idDireccion, idPropietario, idFotos) "
+          "values('" + nombre + "' , '" +habitaciones+ "' , '" +banos+ "' , '" +precio+ "' , '" +desc+"' , '" +servicios+ "' , '1' , '" +id+ " ', '"+idP+" ', '"+idF+"')";
+
+    QSqlQuery insertcasa1;
+    insertcasa1.prepare(casa);
+    insertcasa1.exec();
+
+    ui->plainTextEdit_3->clear();
+    ui->plainTextEdit_2->clear();
+    ui->nom_casa_2->clear();
+    ui->estado_3->clear();
+    ui->municipio->clear();
+    ui->calle_2->clear();
+    ui->colonia_2->clear();
+    ui->no_interior->clear();
+    ui->no_exterior->clear();
+    ui->cp_2->clear();
+    ui->no_habitaciones->clear();
+    ui->banos_2->clear();
+    ui->precio_3->clear();
+}
+void MainWindow::on_addFoto_clicked(){
+    QString idP, casa, idF,insertfoto, idFoto, casa2;
+    auto nombreArchivo=QFileDialog::getOpenFileName(this,"abrir imagen",QDir::rootPath(),"imagenes(*.png *.jpg *.jpeg);; cualquier archivo(*.*)");
+    ruta=nombreArchivo;
+    QFile archivo(ruta);
+    if(!archivo.open(QIODevice::ReadOnly)){
+        return;
+    }
+
+    QByteArray mostrar=archivo.readAll();
+    QPixmap imag;
+    imag.loadFromData(mostrar);
+    ui->img_casa->setPixmap(imag.scaled(181,161));
+    ruta1=ruta;
+    imagen1=mostrar;
+
+    insertfoto="insert into fotos(ruta, imagen)values('"+ruta1+"', :datos);" ;
+
+    QSqlQuery insertfoto1;
+    insertfoto1.prepare(insertfoto);
+    insertfoto1.bindValue(":datos",imagen1);
+    insertfoto1.exec();
+    connect(ui->AddCasa, SIGNAL(clicked()), ui->img_casa, SLOT(clear()));
+
+}
+void MainWindow::on_home_10_clicked(){
+    ui->stackedWidget->setCurrentIndex(10);
+}
+void MainWindow::on_add_10_clicked(){
+    ui->stackedWidget->setCurrentIndex(12);
+}
+void MainWindow::on_reservaciones_10_clicked(){
+    ui->stackedWidget->setCurrentIndex(13);
+}
+void MainWindow::on_ajustes_10_clicked(){
+    Datos();
+    DatosDireccion();
+    DatosFoto();
+    ui->stackedWidget->setCurrentIndex(14);
+}
+void MainWindow::on_salir_10_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//Reservaciones activas
+void MainWindow::on_home_11_clicked(){
+    ui->stackedWidget->setCurrentIndex(10);
+}
+void MainWindow::on_add_11_clicked(){
+   ui->stackedWidget->setCurrentIndex(12);
+}
+void MainWindow::on_reservaciones_11_clicked(){
+    ui->stackedWidget->setCurrentIndex(13);
+}
+void MainWindow::on_ajustes_11_clicked(){
+    Datos();
+    DatosDireccion();
+     DatosFoto();
+    ui->stackedWidget->setCurrentIndex(14);
+}
+void MainWindow::on_salir_11_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//Cambiar datos del perfil del propietario
+void MainWindow::on_home_13_clicked(){
+    ui->stackedWidget->setCurrentIndex(10);
+}
+void MainWindow::on_add_13_clicked(){
+    ui->stackedWidget->setCurrentIndex(12);
+}
+void MainWindow::on_reservaciones_13_clicked(){
+    ui->stackedWidget->setCurrentIndex(13);
+}
+void MainWindow::on_ajustes_13_clicked(){
+    Datos();
+    DatosDireccion();
+    DatosFoto();
+    ui->stackedWidget->setCurrentIndex(14);
+}
+void MainWindow::on_salir_13_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+void MainWindow::on_CambiarFoto_2_clicked(){
+    QPixmap imagen;
+    QIcon imagenreal;
+    QByteArray img;
+    QSqlQuery sql, sacarfoto;
+    QString insertfoto, idF, propi, llamarFoto;
+    auto Archivo=QFileDialog::getOpenFileName(this,"abrir imagen",QDir::rootPath(),"imagenes(*.png *.jpg *.jpeg);; cualquier archivo(*.*)");
+    ruta2= Archivo;
+    QFile archivo(ruta2);
+    if(!archivo.open(QIODevice::ReadOnly)){
+        return;
+    }
+
+    QByteArray mostrar = archivo.readAll();
+    QPixmap imag;
+    imag.loadFromData(mostrar);
+    ui->label_28->setPixmap(imag);
+    ruta3=ruta2;
+    imagen2=mostrar;
+
+    insertfoto="insert into fotos(ruta, imagen)values('"+ruta3+"', :datos);" ;
+    QSqlQuery insertfoto1;
+      insertfoto1.prepare(insertfoto);
+      insertfoto1.bindValue(":datos",imagen2);
+      insertfoto1.exec();
+
+      idF="select MAX(idFotos) from fotos";
+      QSqlQuery insert3;
+      insert3.prepare(idF);
+      insert3.exec();
+      while ( insert3.next()){
+          idF=insert3.value(0).toString();
+          qDebug()<<"id de la foto "+idF;
+      }
+
+      propi="update Propietario set idFotos= '"+ idF +"' where Propietario.usuario='"+username+"';";
+
+      if(sql.exec(propi)){
+          DatosFoto();
+          QMessageBox::information(this, "Foto", "Foto Guardada");
+      }
+}
+void MainWindow::on_aceptar_9_clicked(){
+    QString estado, municipio, calle, colonia, no_interior, no_exterior, cp, direccion, id, casa, idP;
+    QSqlQuery query;
+    estado= ui->direccion_11->text();
+    municipio= ui->direccion_12->text();
+    calle= ui->direccion_6->text();
+    colonia= ui->direccion_7->text();
+    no_interior= ui->direccion_8->text();
+    no_exterior= ui->direccion_9->text();
+    cp= ui->direccion_10->text();
+
+    direccion= "insert into direccion(estado, municipio, calle, colonia, no_interior, no_exterior, cp) "
+    "values('"+estado+ "' , '" + municipio + "' , '" +calle+ "' , '"+colonia+ "' , '" +no_interior+ "' , '" +no_exterior+"' , '"+cp+"')";
+
+    QSqlQuery insert;
+    insert.prepare(direccion);
+    insert.exec();
+
+    id= "select MAX(idDireccion) from direccion";
+
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+        qDebug()<<"id de la direccion"+id;
+    }
+
+   casa="update Propietario set idDireccion= '"+ id +"' where Propietario.usuario='"+username+"'";
+
+   if (query.exec(casa)){
+           ui->direccion_6->clear();
+           ui->direccion_7->clear();
+           ui->direccion_8->clear();
+           ui->direccion_9->clear();
+           ui->direccion_10->clear();
+           ui->direccion_11->clear();
+           ui->direccion_12->clear();
+           Datos();
+           DatosDireccion();
+           QMessageBox::information(this, "Propietario", " Datos actualizados");
+   }
+
+
+}
+//Falta
+void MainWindow::on_aceptar_13_clicked(){
+
+
+}
+void MainWindow::on_aceptar_10_clicked(){
+    QString password=ui->contra2_2->text();
+    QString password2 = ui -> contra_3 -> text();
+    QSqlQuery query, query2;
+    if (query.exec("update login set contrasena = '"+password2+"' where usuario = '"+username+"' and contrasena= '"+password+"';")){
+           QMessageBox::information(this, "Cambiar contraseña", "Datos Actualizados");
+    }
+}
+void MainWindow::on_aceptar_11_clicked(){
+    QString tel;
+    tel=ui->contra_4->text();
+    QSqlQuery query, query2;
+    if (query.exec("update Propietario set telefono ='"+tel+"' where Propietario.usuario= '"+ username+"'")){
+         QMessageBox::information(this, "Cambiar Telefono", "Datos Actualizados");
+         ui->contra_4->clear();
+    }
+}
+//Falta
+void MainWindow::on_aceptar_12_clicked(){
+
+}
+
+
+//-------------------------------------- Interfaces del Cliente ----------------------------------
+
+void MainWindow::DatosC(){
+    QString dato, nombre, a_paterno, a_materno, telefono, correo;
+    QSqlQuery query;
+    dato="select nombre, a_paterno, a_materno, telefono, correo, usuario from Cliente where usuario='"+username+"'";
+    if (query.exec(dato)){
+        while (query.next()){
+            nombre = query.value(0).toString();
+            a_paterno = query.value(1).toString();
+            a_materno = query.value(2).toString();
+            telefono = query.value(3).toString();
+            correo = query.value(4).toString();
+
+            ui->nom->setText(nombre);
+            ui->apellido->setText(a_paterno);
+            ui->apellido_4->setText(a_materno);
+            ui->tel->setText(telefono);
+            ui->correo->setText(correo);
+        }
+        ui->stackedWidget->setCurrentIndex(7);
+    }
+    else{
+        QMessageBox::information(this, "error", "error");
+    }
+}
+void MainWindow::DatosClienteDireccion(){
+    QString estado, municipio, calle, colonia, no_interior, no_exterior, cp, direccion, Propi, id, id2;
+    QSqlQuery query;
+
+    id= "select MAX(idDireccion) from direccion";
+
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+    }
+
+    id2="select MAX(idDireccion) from Cliente";
+    QSqlQuery insert;
+    insert.prepare(id2);
+    insert.exec();
+    while ( insert.next()){
+        id2=insert.value(0).toString();
+    }
+
+    Propi="select d.estado, d.municipio, d.calle, d.colonia, d.no_interior, d.no_exterior, d.cp, c.idDireccion from Direccion as d, Cliente as c where d.idDireccion= ' " +id+" ' and c.idDireccion=' "+id2+" ';";
+     if (query.exec(Propi)){
+          while (query.next()){
+              estado=query.value(0).toString();
+              municipio=query.value(1).toString();
+              calle=query.value(2).toString();
+              colonia=query.value(3).toString();
+              no_interior=query.value(4).toString();
+              no_exterior=query.value(5).toString();
+              cp=query.value(6).toString();
+
+              ui->Estado->setText(estado);
+              ui->Municipio->setText(municipio);
+              ui->Calle->setText(calle);
+              ui->Colonia->setText(colonia);
+              ui->direc_5->setText(no_interior);
+              ui->direc_6->setText(no_exterior);
+              ui->direc_7->setText(cp);
+          }
+           ui->stackedWidget->setCurrentIndex(7);
+     }
+
+
+}
+void MainWindow::DatosClienteFoto(){
+    QPixmap imagen;
+    QIcon imagenreal;
+    QByteArray img;
+    QSqlQuery sql, sacarfoto;
+
+    QString insertfoto, idF, propi, llamarFoto;
+    llamarFoto="call FotoCliente('"+username+"');" ;
+
+
+    sacarfoto.exec(llamarFoto);
+    sacarfoto.next();
+    img=sacarfoto.value(0).toByteArray();
+    imagen.loadFromData(img);
+    ui->fotouser->setPixmap(imagen.scaled(191,181));
+}
+void MainWindow::Reservar(){
+   QString FE, FS;
+   FE= ui->FechaEntrada->text();
+   FS= ui->FechaSalida->text();
+
+}
+
+
+//Catalogo Principal
+void MainWindow::on_home_14_clicked(){
+    ui->stackedWidget->setCurrentIndex(3);
+}
+void MainWindow::on_perfil_14_clicked(){
+    DatosC();
+    DatosClienteDireccion();
+    DatosClienteFoto();
+     ui->stackedWidget->setCurrentIndex(7);
+}
+void MainWindow::on_reservaciones_14_clicked(){
+    ui->stackedWidget->setCurrentIndex(8);
+}
+void MainWindow::on_salir_14_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//Resultado de la busqueda
+void MainWindow::on_home_12_clicked(){
+     ui->stackedWidget->setCurrentIndex(3);
+}
+void MainWindow::on_perfil_12_clicked(){
+    DatosC();
+    DatosClienteDireccion();
+    DatosClienteFoto();
+    ui->stackedWidget->setCurrentIndex(7);
+}
+void MainWindow::on_reservaciones_12_clicked(){
+    ui->stackedWidget->setCurrentIndex(8);
+}
+void MainWindow::on_salir_12_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//Reservar
+void MainWindow::on_home_4_clicked(){
+     ui->stackedWidget->setCurrentIndex(3);
+}
+void MainWindow::on_perfil_4_clicked(){
+    DatosC();
+    DatosClienteDireccion();
+    DatosClienteFoto();
+    ui->stackedWidget->setCurrentIndex(7);
+}
+void MainWindow::on_reservaciones_4_clicked(){
+    ui->stackedWidget->setCurrentIndex(8);
+}
+void MainWindow::on_salir_4_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+void MainWindow::on_volver_clicked(){
+    ui->stackedWidget->setCurrentIndex(3);
+}
+void MainWindow::Pago(){
+    
+    QString reservacion, id, precio, casa;
+    int FE, FS;
+    precio="select precio from casa where casa.nombre= '"+casa+"'";
+    qDebug()<<casa;
+    
+    FE=ui->FechaEntrada->date().day();
+    FS=ui->FechaSalida->date().day();
+    
+    id="select idCliente from Cliente where Cliente.usuario='"+username+"';";
+    QSqlQuery insert3;
+    insert3.prepare(id);
+    insert3.exec();
+    while ( insert3.next()){
+        id=insert3.value(0).toString();
+    }
+    
+    reservacion="insert into reservacion(fecha_entrada, fecha_salida, idCliente) values(";
+    
+}
+void MainWindow::on_enviar_clicked(){
+    ui->stackedWidget->setCurrentIndex(6); 
+}
+
+//Contrato
+void MainWindow::on_home_5_clicked(){
+     ui->stackedWidget->setCurrentIndex(3);
+}
+void MainWindow::on_perfil_5_clicked(){
+    DatosC();
+    DatosClienteDireccion();
+    DatosClienteFoto();
+    ui->stackedWidget->setCurrentIndex(7);
+}
+void MainWindow::on_reservaciones_5_clicked(){
+    ui->stackedWidget->setCurrentIndex(8);
+}
+void MainWindow::on_salir_5_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+void MainWindow::on_tar_aceptar_clicked(){
+
+}
+void MainWindow::on_regresar_3_clicked(){
+ ui->stackedWidget->setCurrentIndex(5);
+}
+
+//Perfil
+void MainWindow::on_home_6_clicked(){
+     ui->stackedWidget->setCurrentIndex(3);
+}
+void MainWindow::on_perfil_6_clicked(){
+    DatosC();
+    DatosClienteDireccion();
+    DatosClienteFoto();
+    ui->stackedWidget->setCurrentIndex(7);
+}
+void MainWindow::on_reservaciones_6_clicked(){
+    ui->stackedWidget->setCurrentIndex(8);
+}
+void MainWindow::on_salir_6_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+void MainWindow::on_aceptar_2_clicked(){
+
+}
+void MainWindow::on_aceptar_clicked(){
+    QString estado, municipio, calle, colonia, no_interior, no_exterior, cp, direccion, id, casa, idP;
+    QSqlQuery query;
+    estado= ui->direccion_13->text();
+    municipio= ui->direccion_14->text();
+    calle= ui->direccion->text();
+    colonia= ui->direccion_2->text();
+    no_interior= ui->direccion_3->text();
+    no_exterior= ui->direccion_4->text();
+    cp= ui->direccion_5->text();
+
+    direccion= "insert into direccion(estado, municipio, calle, colonia, no_interior, no_exterior, cp) "
+    "values('"+estado+ "' , '" + municipio + "' , '" +calle+ "' , '"+colonia+ "' , '" +no_interior+ "' , '" +no_exterior+"' , '"+cp+"')";
+
+    QSqlQuery insert;
+    insert.prepare(direccion);
+    insert.exec();
+
+    id= "select MAX(idDireccion) from direccion";
+
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+        qDebug()<<"id de la direccion"+id;
+    }
+
+   casa="update Cliente set idDireccion= '"+ id +"' where Cliente.usuario='"+username+"'";
+
+   if (query.exec(casa)){
+           ui->direccion_13->clear();
+           ui->direccion_14->clear();
+           ui->direccion->clear();
+           ui->direccion_2->clear();
+           ui->direccion_3->clear();
+           ui->direccion_4->clear();
+           ui->direccion_5->clear();
+           DatosC();
+           DatosClienteDireccion();
+           QMessageBox::information(this, "Cliente", " Datos actualizados");
+   }
+
+}
+void MainWindow::on_aceptar_3_clicked(){
+
+}
+void MainWindow::on_CambiarFoto_clicked(){
+
+    QPixmap imagen;
+    QIcon imagenreal;
+    QByteArray img;
+    QSqlQuery sql, sacarfoto;
+    QString insertfoto, idF, propi, llamarFoto;
+    auto Archivo=QFileDialog::getOpenFileName(this,"abrir imagen",QDir::rootPath(),"imagenes(*.png *.jpg *.jpeg);; cualquier archivo(*.*)");
+    ruta2= Archivo;
+    QFile archivo(ruta2);
+    if(!archivo.open(QIODevice::ReadOnly)){
+        return;
+    }
+
+    QByteArray mostrar = archivo.readAll();
+    QPixmap imag;
+    imag.loadFromData(mostrar);
+    ui->label_28->setPixmap(imag);
+    ruta3=ruta2;
+    imagen2=mostrar;
+
+    insertfoto="insert into fotos(ruta, imagen)values('"+ruta3+"', :datos);" ;
+    QSqlQuery insertfoto1;
+      insertfoto1.prepare(insertfoto);
+      insertfoto1.bindValue(":datos",imagen2);
+      insertfoto1.exec();
+
+      idF="select MAX(idFotos) from fotos";
+      QSqlQuery insert3;
+      insert3.prepare(idF);
+      insert3.exec();
+      while ( insert3.next()){
+          idF=insert3.value(0).toString();
+      }
+
+      propi="update Cliente set idFotos= '"+ idF +"' where Cliente.usuario='"+username+"';";
+
+      if(sql.exec(propi)){
+           DatosClienteFoto();
+          QMessageBox::information(this, "Foto", "Foto Guardada");
+      }
+}
+
+//Reservaciones
+void MainWindow::on_home_7_clicked(){
+     ui->stackedWidget->setCurrentIndex(3);
+}
+void MainWindow::on_perfil_7_clicked(){
+    DatosC();
+    DatosClienteDireccion();
+    DatosClienteFoto();
+    ui->stackedWidget->setCurrentIndex(7);
+}
+void MainWindow::on_reservaciones_7_clicked(){
+    ui->stackedWidget->setCurrentIndex(8);
+}
+void MainWindow::on_salir_7_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//Cancelar reservacion
+void MainWindow::on_aceptar_4_clicked(){
+
+}
+void MainWindow::on_regreso_clicked(){
+
+}
+
+
+//-------------------------------------- Interfaces del Administrador ----------------------------------
+
+void MainWindow::CasaEspera(){
+    QSqlQuery query;
+    QString sql;
+    int numeroColumnas = ui->solicitudesTableWidget->rowCount();
+
+    QList<int> numeros;
+    for(int i=1; i<=numeroColumnas; i++){
+        numeros.append(i);
+        ui->solicitudesTableWidget->removeRow(numeros.value(i));
+    }
+
+    sql = "select nombre, no_habitaciones, no_banos, precio, descripcion, servicios from Casa where casa.idCatalogo='1';";
+    query.exec(sql);
+
+    while(query.next()){
+        QString titulo = query.value(0).toString();
+        QString no_habitaciones = query.value(1).toString();
+        QString no_banos = query.value(2).toString();
+        QString precio = query.value(3).toString();
+        QString desc = query.value(4).toString();
+        QString servicios = query.value(5).toString();
+
+        ui->solicitudesTableWidget->insertRow(ui->solicitudesTableWidget->rowCount());
+
+        int fila=ui->solicitudesTableWidget->rowCount()-1;
+        ui->solicitudesTableWidget->setItem(fila, 0, new QTableWidgetItem(titulo));
+        ui->solicitudesTableWidget->setItem(fila, 1, new QTableWidgetItem(no_habitaciones));
+        ui->solicitudesTableWidget->setItem(fila, 2, new QTableWidgetItem(no_banos));
+        ui->solicitudesTableWidget->setItem(fila, 3, new QTableWidgetItem(precio));
+        ui->solicitudesTableWidget->setItem(fila, 4, new QTableWidgetItem(desc));
+        ui->solicitudesTableWidget->setItem(fila, 5, new QTableWidgetItem(servicios));
+    }
+}
+
+//Opciones Admin
+void MainWindow::on_ir_clicked(){
+    CatalogoAdmin();
+    ui->stackedWidget->setCurrentIndex(16);
+}
+void MainWindow::on_ir_3_clicked(){
+    CasaEspera();
+    ui->stackedWidget->setCurrentIndex(18);
+}
+void MainWindow::on_Salir_clicked(){
+   ui->stackedWidget->setCurrentIndex(0);
+}
+
+//Catalogo Administrados
+void MainWindow::on_volver_2_clicked(){
+    ui->stackedWidget->setCurrentIndex(15);
+}
+
+//Vista detallada de las casas
+void MainWindow::on_regresar_7_clicked(){
+    ui->stackedWidget->setCurrentIndex(16);
+}
+void MainWindow::on_eliminar_clicked(){
+
+}
+
+//Tabla de Casas a ser registradas
+void MainWindow::on_volver_3_clicked(){
+    ui->stackedWidget->setCurrentIndex(15);
+}
+void MainWindow::on_solicitudesTableWidget_itemClicked(QTableWidgetItem *item){
+     QString catalogo;
+    f= item->row();
+    QTableWidgetItem * nom, *no_habitaciones, *no_banos, *precio, *descripcion, *servicios;
+    nom= ui->solicitudesTableWidget->item(f, 0);
+    no_habitaciones= ui->solicitudesTableWidget->item(f, 1);
+    no_banos= ui->solicitudesTableWidget->item(f, 2);
+    precio= ui->solicitudesTableWidget->item(f, 3);
+    descripcion= ui->solicitudesTableWidget->item(f, 4);
+    servicios= ui->solicitudesTableWidget->item(f, 5);
+    ui->ANom->setText(nom->text());
+    ui->ANH->setText(no_habitaciones->text());
+    ui->ANB->setText(no_banos->text());
+    ui->APrec->setText(precio->text());
+    ui->ADesc->setText(descripcion->text());
+    ui->ASev->setText(servicios->text());
+
+}
+void MainWindow::on_reserva_clicked(){
+    ui->stackedWidget->setCurrentIndex(19);
+}
+
+//Valorar casas
+void MainWindow::on_volver4_clicked(){
+   ui->stackedWidget->setCurrentIndex(18);
+   CasaEspera();
+}
+void MainWindow::on_anadir_clicked(){
+    QString catalogo, valoracion, nombre, id;
+    QTableWidgetItem * nom;
+    QSqlQuery query;
+    nombre=ui->ANom->text();
+    nom= ui->solicitudesTableWidget->item(f, 0);
+    valoracion=ui->comboBox->currentText();
+
+    id="select idCasa from casa where Casa.nombre = '"+nombre+"';";
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+        qDebug()<<"id  "+id;
+    }
+
+    catalogo="update casa set idCatalogo ='2', valoracion = '"+valoracion+"' where Casa.idCasa= '"+id+"';";
+    if (query.exec(catalogo)){
+            QMessageBox::about(this, "Valoracion", "Casa Valorada");
+
+    }
+
+}
+void MainWindow::on_Rechazar_clicked(){
+    QString catalogo, valoracion, nombre, id;
+    QTableWidgetItem * nom;
+    QSqlQuery query;
+    nombre=ui->ANom->text();
+    nom= ui->solicitudesTableWidget->item(f, 0);
+
+    id="select idCasa from casa where Casa.nombre = '"+nombre+"';";
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+
+    }
+
+    catalogo="update casa set idCatalogo ='3' where Casa.idCasa= '"+id+"';";
+    if (query.exec(catalogo)){
+            QMessageBox::about(this, "Valoracion", "Casa Valorada");
+
+    }
+    qDebug()<<"id  "+catalogo;
+}
+

@@ -1,0 +1,663 @@
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+#include <QFile>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QPixmap>
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow){
+
+    ui->setupUi(this);
+    db = QSqlDatabase::addDatabase("QMYSQL");
+    db.setPort(3306);
+    db.setHostName("localhost");
+    db.setUserName("root");
+    db.setPassword("");
+    db.setDatabaseName("rentas");
+    if (!db.open()){ qDebug() << "Error al conectar."; }
+    else{ qDebug() << "Conectada."; }
+
+
+    QPixmap pix5("C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/inicio.jpg");
+    int counterf = 0;
+    int counterc = 0;
+
+    for(int i=0; i<35 ; i++){
+        QLabel *label = new QLabel;
+        label->setPixmap(pix5.scaled(250,153));
+        ui->layout->addWidget(label, counterf, counterc,1,1);
+        label->setFixedSize(210, 125);
+
+        QPushButton *ver = new QPushButton("Ver detalles");
+        ui->layout->addWidget(ver, counterf+1, counterc,1,1);
+        ver->setFixedSize(90, 20);
+
+        connect(ver, SIGNAL(clicked()), this, SLOT(Detalles()));
+        counterc++;
+        if (counterc == 3){
+            counterf= counterf+2;
+            counterc = 0;
+        }
+    }
+}
+
+void MainWindow::Detalles(){
+    ui->stackedWidget->setCurrentIndex(5);
+}
+
+MainWindow::~MainWindow(){
+    delete ui;
+}
+
+//--------------------------------------Interfaces principales----------------------------------
+
+void MainWindow::on_IniciarSesion_clicked(){
+    QSqlQuery sql;
+    username = ui -> lineEdit_Usuario -> text();
+    password = ui -> lineEdit_password -> text();
+
+
+    iniciar="select usuario, contrasena from login where usuario='" +username+"' and contrasena = '"+ password +"'";
+
+    if(ui->lineEdit_Usuario->text()=="Admin" && ui->lineEdit_password->text()=="admin" ){
+        QMessageBox::about(this, "Bienvenido", "Bienvenido Administrador");
+        ui->stackedWidget->setCurrentIndex(16);
+    }
+    else{
+        if(ui->ButtonCliente_2->isChecked()){
+            if(ui->ButtonCliente_2->text()=="Cliente"){
+                if(sql.exec(iniciar)){
+                    QMessageBox::about(this, "Bienvenido", "Bienvenido Cliente");
+                    ui->stackedWidget->setCurrentIndex(3);
+                }
+            }
+        }
+        if(ui->ButtonPropi_2->isChecked()){
+            if(ui->ButtonPropi_2->text()=="Propietario"){
+                if(sql.exec(iniciar)){
+                    QMessageBox::about(this, "Bienvenido", "Bienvenido Propietario");
+                    ui->stackedWidget->setCurrentIndex(10);
+                }
+            }
+        }
+
+    }
+    ui -> lineEdit_Usuario ->clear();
+    ui -> lineEdit_password ->clear();
+    ui->ButtonCliente_2->setAutoExclusive(false);
+    ui->ButtonCliente_2->setChecked(false);
+    ui->ButtonPropi_2->setAutoExclusive(false);
+    ui->ButtonPropi_2->setChecked(false);
+}
+void MainWindow::on_registro_clicked(){
+    ui->stackedWidget->setCurrentIndex(1);
+}
+void MainWindow::on_regresar_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+void MainWindow::on_OContra_clicked(){
+    ui->stackedWidget->setCurrentIndex(2);
+}
+void MainWindow::on_CrearCuenta_clicked(){
+    if (db.open()){
+        QString nombre, apellidom, apellidop, usuario, email, contra, tel , checkExist, existente;
+        QSqlQuery sql, sql2, sql3;
+        nombre=ui->NombreReg->text();
+        apellidom=ui->ApellidoReg->text();
+        apellidop=ui->ApellidoReg_2->text();
+        usuario=ui->UsuarioReg->text();
+        tel=ui->TelReg->text();
+        email=ui->CorreoReg->text();
+        contra=ui->ContraReg->text();
+        existente = "select * from login where usuario = '"+ usuario +"'";
+
+        if(nombre.isEmpty()||apellidom.isEmpty()||apellidop.isEmpty()||email.isEmpty()||contra.isEmpty()||usuario.isEmpty()|| tel.isEmpty()){
+            QMessageBox::about(this, "Error", "Campos Vacios");
+        }
+        else{
+            if(sql.exec(existente)){
+                if(sql.next() == true){
+                    QMessageBox::information(this, "Error al registrar", "Nombre de usuario ya existe");
+                }
+                else{
+                    if(ui->ButtonCliente->isChecked()){
+                        if(ui->ButtonCliente->text()=="Cliente"){
+                            qDebug() << "insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "');";
+                            qDebug() << "insert into cliente(nombre, a_paterno, a_materno, telefono, correo, usuario) values('" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "','" +usuario+ "');";
+
+                            if (sql2.exec("insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "')")){
+                                if(sql3.exec("insert into cliente (usuario, nombre, a_paterno, a_materno, telefono, correo) values('" +usuario+ "','" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "')")){
+                                    QMessageBox::about(this, "Registro", "Registro Exitoso");
+                                }
+                                else{
+                                    QMessageBox::about(this, "Regitro", "La cuenta no se ha creado");
+                                }
+                            }
+                        }
+                    }
+                    if(ui->ButtonPropi->isChecked()){
+                        if(ui->ButtonPropi->text()=="Propietario"){
+                            qDebug() << "insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "');";
+                            qDebug() << "insert into propietario(nombre, a_paterno, a_materno, telefono, correo, usuario) values('" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "','" +usuario+ "');";
+
+                            if (sql2.exec("insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "')")){
+                                if(sql3.exec("insert into propietario (usuario, nombre, a_paterno, a_materno, telefono, correo) values('" +usuario+ "','" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "')")){
+                                    QMessageBox::about(this, "Registro", "Registro Exitoso");
+                                }
+                                else{
+                                    QMessageBox::about(this, "Regitro", "La cuenta no se ha creado");
+                                }
+                            }
+                        }
+                    }
+                    ui->NombreReg->clear();
+                    ui->ApellidoReg->clear();
+                    ui->ApellidoReg_2->clear();
+                    ui->UsuarioReg->clear();
+                    ui->TelReg->clear();
+                    ui->CorreoReg->clear();
+                    ui->ContraReg->clear();
+                }
+            }
+        }
+    }
+}
+void MainWindow::on_regresar_2_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+void MainWindow::on_cambiarC_clicked(){
+
+    QString username=ui->user-> text();
+    QString password = ui -> CPass -> text();
+    QString password2 = ui -> CPass2-> text();
+    QSqlQuery query, query2;
+    if (query.exec("update login set contrasena = '"+password2+"' where usuario = '"+username+"' and contrasena= '"+password+"';")){
+            ui->stackedWidget->setCurrentIndex(0);
+    }
+}
+
+//-------------------------------------- Interfaces del Propietario ----------------------------------
+
+//Datos del propietario
+void MainWindow::Datos(){
+   QString dato, nombre, a_paterno, a_materno, telefono, correo;
+    QSqlQuery query;
+    dato="select nombre, a_paterno, a_materno, telefono, correo, usuario from Propietario where usuario='"+username+"'";
+    if (query.exec(dato)){
+        while (query.next()){
+            nombre = query.value(0).toString();
+            a_paterno = query.value(1).toString();
+            a_materno = query.value(2).toString();
+            telefono = query.value(3).toString();
+            correo = query.value(4).toString();
+
+            ui->nom_2->setText(nombre);
+            ui->apellido_2->setText(a_paterno);
+            ui->apellido_3->setText(a_materno);
+            ui->tel_2->setText(telefono);
+            ui->correo_2->setText(correo);
+        }
+        ui->stackedWidget->setCurrentIndex(15);
+    }
+    else{
+       QMessageBox::information(this, "error", "error");
+    }
+    qDebug()<<dato;
+}
+void MainWindow::DatosDireccion(){
+    QString estado, municipio, calle, colonia, no_interior, no_exterior, cp, direccion, Propi, id, id2;
+    QSqlQuery query;
+
+    id= "select MAX(idDireccion) from direccion";
+
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+        qDebug()<<"id en direccion "+id;
+    }
+
+    id2="select MAX(idDireccion) from Propietario";
+    QSqlQuery insert;
+    insert.prepare(id2);
+    insert.exec();
+    while ( insert.next()){
+        id2=insert.value(0).toString();
+        qDebug()<<"id en Propietario"+id2;
+    }
+
+    Propi="select d.estado, d.municipio, d.calle, d.colonia, d.no_interior, d.no_exterior, d.cp, p.idDireccion from Direccion as d, Propietario as p where d.idDireccion= ' " +id+" ' and p.idDireccion=' "+id2+" ';";
+     if (query.exec(Propi)){
+          while (query.next()){
+              estado=query.value(0).toString();
+              municipio=query.value(1).toString();
+              calle=query.value(2).toString();
+              colonia=query.value(3).toString();
+              no_interior=query.value(4).toString();
+              no_exterior=query.value(5).toString();
+              cp=query.value(6).toString();
+
+              ui->estado_5->setText(estado);
+              ui->municipio_2->setText(municipio);
+              ui->calle_4->setText(calle);
+              ui->colonia_4->setText(colonia);
+              ui->no_interior_3->setText(no_interior);
+              ui->no_exterior_3->setText(no_exterior);
+              ui->cp_4->setText(cp);
+          }
+           ui->stackedWidget->setCurrentIndex(15);
+     }
+}
+
+
+//Catalogo Casa Registradas
+void MainWindow::on_home_8_clicked(){
+    ui->stackedWidget->setCurrentIndex(10);
+}
+void MainWindow::on_add_8_clicked(){
+    ui->stackedWidget->setCurrentIndex(13);
+}
+void MainWindow::on_reservaciones_8_clicked(){
+
+    ui->stackedWidget->setCurrentIndex(14);
+}
+void MainWindow::on_ajustes_8_clicked(){
+    Datos();
+    DatosDireccion();
+    ui->stackedWidget->setCurrentIndex(15);
+}
+void MainWindow::on_salir_8_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//Pueblicar, Eliminar, Registrar casa
+void MainWindow::on_pushButton_ActualizarCasa_2_clicked(){
+    ui->stackedWidget->setCurrentIndex(12);
+}
+void MainWindow::on_pushButton_EliminarCasa_2_clicked(){
+    ui->stackedWidget->setCurrentIndex(12);
+}
+void MainWindow::on_pushButton_PublicarCasa_2_clicked(){
+
+}
+void MainWindow::on_home_9_clicked(){
+    ui->stackedWidget->setCurrentIndex(10);
+}
+void MainWindow::on_add_9_clicked(){
+    ui->stackedWidget->setCurrentIndex(13);
+}
+void MainWindow::on_reservaciones_9_clicked(){
+    ui->stackedWidget->setCurrentIndex(14);
+}
+void MainWindow::on_ajustes_9_clicked(){
+    Datos();
+    DatosDireccion();
+    ui->stackedWidget->setCurrentIndex(15);
+}
+void MainWindow::on_salir_9_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//Actualizar datos de la casa
+void MainWindow::on_aceptar_5_clicked(){
+    QString nom, idP, casa;
+    nom= ui->C_nom->text();
+    QSqlQuery query;
+   idP="select idPropietario from Propietario where Propietario.usuario= '"+username+"'";
+    QSqlQuery idPropi;
+    idPropi.prepare(idP);
+    idPropi.exec();
+    while ( idPropi.next()){
+        idP=idPropi.value(0).toString();
+        qDebug()<<"id del propietario "+idP;
+    }
+    casa="update Casa set nombre= '"+ nom +"' where Casa.idPropietario='"+idP+"'";
+
+    if (query.exec(casa)){
+            ui->C_nom->clear();
+            QMessageBox::information(this, "Casa", " Datos actualizados");
+    }
+    qDebug()<< casa;
+}
+void MainWindow::on_aceptar_6_clicked(){
+    QString habitaciones, idP, casa;
+    habitaciones= ui->C_habitaciones->text();
+    QSqlQuery query;
+   idP="select idPropietario from Propietario where Propietario.usuario= '"+username+"'";
+    QSqlQuery idPropi;
+    idPropi.prepare(idP);
+    idPropi.exec();
+    while ( idPropi.next()){
+        idP=idPropi.value(0).toString();
+        qDebug()<<"id del propietario "+idP;
+    }
+
+    casa="update Casa set no_habitaciones= '"+ habitaciones +"' where Casa.idPropietario='"+idP+"'";
+
+    if (query.exec(casa)){
+            ui->C_habitaciones->clear();
+            QMessageBox::information(this, "Casa", " Datos actualizados");
+    }
+    qDebug()<< casa;
+
+}
+void MainWindow::on_aceptar_7_clicked(){
+    QString precio, idP, casa;
+    precio = ui->C_precio->text();
+    QSqlQuery query;
+   idP="select idPropietario from Propietario where Propietario.usuario= '"+username+"'";
+
+   QSqlQuery idPropi;
+    idPropi.prepare(idP);
+    idPropi.exec();
+    while ( idPropi.next()){
+        idP=idPropi.value(0).toString();
+        qDebug()<<"id del propietario "+idP;
+    }
+
+    casa="update Casa set precio= '"+ precio +"' where Casa.idPropietario='"+idP+"'";
+
+    if (query.exec(casa)){
+            ui->C_precio->clear();
+            QMessageBox::information(this, "Casa", " Datos actualizados");
+    }
+    qDebug()<< casa;
+
+}
+void MainWindow::on_aceptar_8_clicked(){
+    QString servicio, idP, casa;
+    servicio = ui->C_servicios->text();
+    QSqlQuery query;
+   idP="select idPropietario from Propietario where Propietario.usuario= '"+username+"'";
+
+   QSqlQuery idPropi;
+    idPropi.prepare(idP);
+    idPropi.exec();
+    while ( idPropi.next()){
+        idP=idPropi.value(0).toString();
+        qDebug()<<"id del propietario "+idP;
+    }
+
+    casa="update Casa set servicios= '"+ servicio +"' where Casa.idPropietario='"+idP+"'";
+
+    if (query.exec(casa)){
+            ui->C_servicios->clear();
+            QMessageBox::information(this, "Casa", " Datos actualizados");
+    }
+    qDebug()<< casa;
+}
+void MainWindow::on_regresar_5_clicked(){
+    ui->stackedWidget->setCurrentIndex(11);
+}
+
+//Agregar casa
+void MainWindow::on_AddCasa_clicked(){
+    QString desc, servicios, nombre, estado,municipio, calle, colonia, no_interior, no_exterior, cp, habitaciones, banos, precio;
+    QByteArray imagen;
+    QSqlQuery sql;
+    QString direccion, casa, id, idP, idF;
+    desc= ui->plainTextEdit_3->toPlainText();
+    servicios= ui->plainTextEdit_2->toPlainText();
+    nombre= ui->nom_casa_2->text();
+    estado= ui->estado_3->text();
+    municipio= ui->municipio->text();
+    calle= ui->calle_2->text();
+    colonia= ui->colonia_2->text();
+    no_interior= ui->no_interior->text();
+    no_exterior= ui->no_exterior->text();
+    cp=ui->cp_2->text();
+    habitaciones=ui->no_habitaciones->text();
+    banos= ui->banos_2->text();
+    precio= ui->precio_3->text();
+
+    direccion= "insert into direccion(estado, municipio, calle, colonia, no_interior, no_exterior, cp) "
+               "values('"+estado+ "' , '" + municipio + "' , '" +calle+ "' , '"+colonia+ "' , '" +no_interior+ "' , '" +no_exterior+"' , '"+cp+"')";
+
+    QSqlQuery insert;
+    insert.prepare(direccion);
+    insert.exec();
+
+    id= "select MAX(idDireccion) from direccion";
+
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+        qDebug()<<"id de la direccion"+id;
+    }
+
+    idP="select idPropietario from Propietario where Propietario.usuario= '"+username+"'";
+    QSqlQuery idPropi;
+    idPropi.prepare(idP);
+    idPropi.exec();
+    while ( idPropi.next()){
+        idP=idPropi.value(0).toString();
+        qDebug()<<"id del propietario "+idP;
+    }
+
+    idF="select MAX(idFotos) from fotos";
+    QSqlQuery insert3;
+    insert3.prepare(idF);
+    insert3.exec();
+    while ( insert3.next()){
+        idF=insert3.value(0).toString();
+        qDebug()<<"id de la foto "+idF;
+    }
+
+    casa= "insert into casa(nombre, no_habitaciones, no_banos, precio, descripcion, servicios, idCatalogo, idDireccion, idPropietario, idFotos) "
+          "values('" + nombre + "' , '" +habitaciones+ "' , '" +banos+ "' , '" +precio+ "' , '" +desc+"' , '" +servicios+ "' , '1' , '" +id+ " ', '"+idP+" ', '"+idF+"')";
+
+    QSqlQuery insertcasa1;
+    insertcasa1.prepare(casa);
+    insertcasa1.exec();
+
+    qDebug()<<idP;
+    qDebug()<<direccion;
+    qDebug()<<id;
+    qDebug()<<casa;
+
+    ui->plainTextEdit_3->clear();
+    ui->plainTextEdit_2->clear();
+    ui->nom_casa_2->clear();
+    ui->estado_3->clear();
+    ui->municipio->clear();
+    ui->calle_2->clear();
+    ui->colonia_2->clear();
+    ui->no_interior->clear();
+    ui->no_exterior->clear();
+    ui->cp_2->clear();
+    ui->no_habitaciones->clear();
+    ui->banos_2->clear();
+    ui->precio_3->clear();
+}
+void MainWindow::on_addFoto_clicked(){
+    QString idP, casa, idF,insertfoto, idFoto, casa2;
+    auto nombreArchivo=QFileDialog::getOpenFileName(this,"abrir imagen",QDir::rootPath(),"imagenes(*.png *.jpg *.jpeg);; cualquier archivo(*.*)");
+    ruta=nombreArchivo;
+    QFile archivo(ruta);
+    if(!archivo.open(QIODevice::ReadOnly)){
+        return;
+    }
+
+    QByteArray mostrar=archivo.readAll();
+    QPixmap imag;
+    imag.loadFromData(mostrar);
+    ui->img_casa->setPixmap(imag);
+    ruta1=ruta;
+    imagen1=mostrar;
+
+    insertfoto="insert into fotos(ruta, imagen)values('"+ruta1+"', :datos);" ;
+
+    QSqlQuery insertfoto1;
+    insertfoto1.prepare(insertfoto);
+    insertfoto1.bindValue(":datos",imagen1);
+    insertfoto1.exec();
+
+    qDebug()<< insertfoto;
+
+}
+void MainWindow::on_home_10_clicked(){
+    ui->stackedWidget->setCurrentIndex(10);
+}
+void MainWindow::on_add_10_clicked(){
+    ui->stackedWidget->setCurrentIndex(13);
+}
+void MainWindow::on_reservaciones_10_clicked(){
+    ui->stackedWidget->setCurrentIndex(14);
+}
+void MainWindow::on_ajustes_10_clicked(){
+    Datos();
+    DatosDireccion();
+    ui->stackedWidget->setCurrentIndex(15);
+}
+void MainWindow::on_salir_10_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//Reservaciones activas
+void MainWindow::on_home_11_clicked(){
+    ui->stackedWidget->setCurrentIndex(10);
+}
+void MainWindow::on_add_11_clicked(){
+    ui->stackedWidget->setCurrentIndex(13);
+}
+void MainWindow::on_reservaciones_11_clicked(){
+    ui->stackedWidget->setCurrentIndex(14);
+}
+void MainWindow::on_ajustes_11_clicked(){
+    Datos();
+    DatosDireccion();
+    ui->stackedWidget->setCurrentIndex(15);
+}
+void MainWindow::on_salir_11_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//Cambiar datos del perfil del propietario
+void MainWindow::on_home_13_clicked(){
+    ui->stackedWidget->setCurrentIndex(10);
+}
+void MainWindow::on_add_13_clicked(){
+    ui->stackedWidget->setCurrentIndex(13);
+}
+void MainWindow::on_reservaciones_13_clicked(){
+    ui->stackedWidget->setCurrentIndex(14);
+}
+void MainWindow::on_ajustes_13_clicked(){
+    Datos();
+    DatosDireccion();
+    ui->stackedWidget->setCurrentIndex(15);
+}
+void MainWindow::on_salir_13_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+void MainWindow::on_CambiarFoto_2_clicked(){
+
+}
+void MainWindow::on_aceptar_9_clicked(){
+    QString estado, municipio, calle, colonia, no_interior, no_exterior, cp, direccion, id, casa, idP;
+    QSqlQuery query;
+    estado= ui->direccion_11->text();
+    municipio= ui->direccion_12->text();
+    calle= ui->direccion_6->text();
+    colonia= ui->direccion_7->text();
+    no_interior= ui->direccion_8->text();
+    no_exterior= ui->direccion_9->text();
+    cp= ui->direccion_10->text();
+
+    direccion= "insert into direccion(estado, municipio, calle, colonia, no_interior, no_exterior, cp) "
+    "values('"+estado+ "' , '" + municipio + "' , '" +calle+ "' , '"+colonia+ "' , '" +no_interior+ "' , '" +no_exterior+"' , '"+cp+"')";
+
+    QSqlQuery insert;
+    insert.prepare(direccion);
+    insert.exec();
+
+    id= "select MAX(idDireccion) from direccion";
+
+    QSqlQuery insert2;
+    insert2.prepare(id);
+    insert2.exec();
+    while ( insert2.next()){
+        id=insert2.value(0).toString();
+        qDebug()<<"id de la direccion"+id;
+    }
+
+   casa="update Propietario set idDireccion= '"+ id +"' where Propietario.usuario='"+username+"'";
+
+   if (query.exec(casa)){
+           ui->C_servicios->clear();
+           Datos();
+           DatosDireccion();
+           QMessageBox::information(this, "Casa", " Datos actualizados");
+   }
+
+
+}
+void MainWindow::on_aceptar_13_clicked(){
+
+}
+void MainWindow::on_aceptar_10_clicked(){
+
+}
+void MainWindow::on_aceptar_11_clicked(){
+
+}
+void MainWindow::on_aceptar_12_clicked(){
+
+}
+
+
+//-------------------------------------- Interfaces del Cliente ----------------------------------
+
+//Catalogo Principal
+void MainWindow::on_home_14_clicked(){
+
+}
+void MainWindow::on_perfil_14_clicked(){
+
+}
+void MainWindow::on_reservaciones_14_clicked(){
+}
+void MainWindow::on_salir_14_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//Resultado de la busqueda
+void MainWindow::on_home_12_clicked(){
+
+}
+void MainWindow::on_perfil_12_clicked(){
+
+}
+void MainWindow::on_reservaciones_12_clicked(){
+
+}
+void MainWindow::on_salir_12_clicked(){
+
+}
+
+//Reservar
+void MainWindow::on_home_4_clicked(){
+
+}
+void MainWindow::on_perfil_4_clicked(){
+
+}
+void MainWindow::on_reservaciones_4_clicked(){
+
+}
+void MainWindow::on_salir_4_clicked(){
+
+}
+void MainWindow::on_volver_clicked(){
+
+}
+void MainWindow::on_enviar_clicked(){
+
+}
+
+

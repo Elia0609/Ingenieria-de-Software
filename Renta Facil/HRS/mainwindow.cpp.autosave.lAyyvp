@@ -1,0 +1,163 @@
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+#include <QFile>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QPixmap>
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow){
+
+    ui->setupUi(this);
+    db = QSqlDatabase::addDatabase("QMYSQL");
+    db.setPort(3306);
+    db.setHostName("localhost");
+    db.setUserName("root");
+    db.setPassword("");
+    db.setDatabaseName("");
+    if (!db.open()){ qDebug() << "Error al conectar."; }
+    else{ qDebug() << "Conectada."; }
+
+
+    QPixmap pix5("C:/Users/ailes/OneDrive/Escritorio/HRS/Recursos/inicio.jpg");
+    int counterf = 0;
+    int counterc = 0;
+
+    for(int i=0; i<35 ; i++){
+        QLabel *label = new QLabel;
+        label->setPixmap(pix5.scaled(250,153));
+        ui->layout->addWidget(label, counterf, counterc,1,1);
+        label->setFixedSize(210, 125);
+
+        QPushButton *ver = new QPushButton("Ver detalles");
+        ui->layout->addWidget(ver, counterf+1, counterc,1,1);
+        ver->setFixedSize(90, 20);
+
+        connect(ver, SIGNAL(clicked()), this, SLOT(Detalles()));
+        counterc++;
+        if (counterc == 3){
+            counterf= counterf+2;
+            counterc = 0;
+        }
+    }
+}
+
+void MainWindow::Detalles(){
+    ui->stackedWidget->setCurrentIndex(5);
+}
+
+MainWindow::~MainWindow()
+{
+    delete ui;
+}
+
+//--------------------------------------Interfaces principales----------------------------------
+
+void MainWindow::on_IniciarSesion_clicked(){
+    QString username = ui -> lineEdit_Usuario -> text();
+    QString password = ui -> lineEdit_password -> text();
+    QString verifica;
+    QSqlQuery query, query2;
+    
+    verifica = "select usuario, contrasena from Login where usuario='"+ username+"' and contrasena='" + password + "'";
+    
+    
+}
+void MainWindow::on_registro_clicked(){
+    ui->stackedWidget->setCurrentIndex(1);
+}
+void MainWindow::on_regresar_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+void MainWindow::on_OContra_clicked(){
+    ui->stackedWidget->setCurrentIndex(2);
+}
+void MainWindow::on_CrearCuenta_clicked(){
+    if (db.open()){
+        QString nombre, apellidom, apellidop, usuario, email, contra, tel , checkExist, existente;
+        QSqlQuery sql, sql2, sql3;
+        nombre=ui->NombreReg->text();
+        apellidom=ui->ApellidoReg->text();
+        apellidop=ui->ApellidoReg_2->text();
+        usuario=ui->UsuarioReg->text();
+        tel=ui->TelReg->text();
+        email=ui->CorreoReg->text();
+        contra=ui->ContraReg->text();
+        existente = "select * from login where usuario = '"+ usuario +"'";
+
+        if(nombre.isEmpty()||apellidom.isEmpty()||apellidop.isEmpty()||email.isEmpty()||contra.isEmpty()||usuario.isEmpty()|| tel.isEmpty()){
+            QMessageBox::about(this, "Error", "Campos Vacios");
+        }
+        else{
+            if(sql.exec(existente)){
+                if(sql.next() == true){
+                    QMessageBox::information(this, "Error al registrar", "Nombre de usuario ya existe");
+                }
+                else{
+                    if(ui->ButtonCliente->isChecked()){
+                        if(ui->ButtonCliente->text()=="Cliente"){
+                            qDebug() << "insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "');";
+                            qDebug() << "insert into cliente(nombre, a_paterno, a_materno, telefono, correo, usuario) values('" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "','" +usuario+ "');";
+
+                            if (sql2.exec("insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "')")){
+                                if(sql3.exec("insert into cliente (usuario, nombre, a_paterno, a_materno, telefono, correo) values('" +usuario+ "','" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "')")){
+                                    QMessageBox::about(this, "Registro", "Registro Exitoso");
+                                }
+                                else{
+                                    QMessageBox::about(this, "Regitro", "La cuenta no se ha creado");
+                                }
+                            }
+                        }
+                    }
+                    if(ui->ButtonPropi->isChecked()){
+                        if(ui->ButtonPropi->text()=="Propietario"){
+                            qDebug() << "insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "');";
+                            qDebug() << "insert into propietario(nombre, a_paterno, a_materno, telefono, correo, usuario) values('" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "','" +usuario+ "');";
+
+                            if (sql2.exec("insert into Login(usuario,  contrasena) values ('" + usuario+ "','" +contra+ "')")){
+                                if(sql3.exec("insert into propietario (usuario, nombre, a_paterno, a_materno, telefono, correo) values('" +usuario+ "','" +nombre+ "','" +apellidop+ "','" +apellidom+ "','"  +tel+ "','" +email+ "')")){
+                                    QMessageBox::about(this, "Registro", "Registro Exitoso");
+                                }
+                                else{
+                                    QMessageBox::about(this, "Regitro", "La cuenta no se ha creado");
+                                }
+                            }
+                        }
+                    }
+                    ui->NombreReg->clear();
+                    ui->ApellidoReg->clear();
+                    ui->ApellidoReg_2->clear();
+                    ui->UsuarioReg->clear();
+                    ui->TelReg->clear();
+                    ui->CorreoReg->clear();
+                    ui->ContraReg->clear();
+                }
+            }
+        }
+    }
+}
+void MainWindow::on_regresar_2_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+void MainWindow::on_cambiarC_clicked(){
+
+    QString username=ui->user-> text();
+    QString password = ui -> CPass -> text();
+    QString password2 = ui -> CPass2-> text();
+    QSqlQuery query, query2;
+    if (query.exec("update login set contrasena = '"+password2+"' where usuario = '"+username+"' and contrasena= '"+password+"';")){
+            ui->stackedWidget->setCurrentIndex(0);
+    }
+}
+
+//-------------------------------------- Interfaces del Cliente ----------------------------------
+
+void MainWindow::on_salir_14_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
+
+//-------------------------------------- Interfaces del Propietario ----------------------------------
+void MainWindow::on_salir_8_clicked(){
+    ui->stackedWidget->setCurrentIndex(0);
+}
